@@ -14,9 +14,7 @@ class _StudentFormState extends State<StudentForm> {
   final _formKey = GlobalKey<FormState>();
   String? selectedJenisKelamin;
 
-
-
-
+  List<String> dusunList = [];
 
   // === DATA SISWA ===
   final nisnController = TextEditingController();
@@ -45,32 +43,89 @@ class _StudentFormState extends State<StudentForm> {
   @override
   void initState() {
     super.initState();
+
+    // 1️⃣ Mapping data siswa
     if (widget.data != null) {
-      // Mapping data siswa
-      nisnController.text = widget.data!['nisn'] ?? '';
-      namaController.text = widget.data!['nama_panjang'] ?? '';
-      jkController.text = widget.data!['jenis_kelamin'] ?? '';
-      agamaController.text = widget.data!['agama'] ?? '';
-      ttlController.text = widget.data!['tempat_lahir'] ?? '';
-      nomorHpController.text = widget.data!['nomor_hp'] ?? '';
-      nikController.text = widget.data!['nik'] ?? '';
-      alamatController.text = widget.data!['alamat'] ?? '';
+      nisnController.text = widget.data!['nisn']?.toString() ?? '';
+      namaController.text = widget.data!['nama_panjang']?.toString() ?? '';
+      jkController.text = widget.data!['jenis_kelamin']?.toString() ?? '';
+      selectedJenisKelamin = jkController.text.isNotEmpty ? jkController.text : null;
+      agamaController.text = widget.data!['agama']?.toString() ?? '';
 
-      // Mapping data wilayah
+      // Tanggal lahir: cek apakah data ada, ubah ke format string yyyy-mm-dd
+      final ttl = widget.data!['tempat_lahir'];
+      if (ttl != null && ttl is String && ttl.isNotEmpty) {
+        ttlController.text = ttl;
+      } else if (ttl != null && ttl is DateTime) {
+        ttlController.text =
+            "${ttl.year}-${ttl.month.toString().padLeft(2, '0')}-${ttl.day.toString().padLeft(2, '0')}";
+      } else {
+        ttlController.text = '';
+      }
+
+      nomorHpController.text = widget.data!['nomor_hp']?.toString() ?? '';
+      nikController.text = widget.data!['nik']?.toString() ?? '';
+      alamatController.text = widget.data!['alamat']?.toString() ?? '';
+
+      // 2️⃣ Mapping data wilayah
       final wilayah = widget.data!['wilayah'] ?? {};
-      dusunController.text = wilayah['dusun'] ?? '';
-      desaController.text = wilayah['desa'] ?? '';
-      kecamatanController.text = wilayah['kecamatan'] ?? '';
-      kabupatenController.text = wilayah['kabupaten'] ?? '';
-      provinsiController.text = wilayah['provinsi'] ?? '';
-      kodePosController.text = wilayah['kode_pos'] ?? '';
+      dusunController.text = wilayah['dusun']?.toString() ?? '';
+      desaController.text = wilayah['desa']?.toString() ?? '';
+      kecamatanController.text = wilayah['kecamatan']?.toString() ?? '';
+      kabupatenController.text = wilayah['kabupaten']?.toString() ?? '';
+      provinsiController.text = wilayah['provinsi']?.toString() ?? '';
+      kodePosController.text = wilayah['kode_pos']?.toString() ?? '';
 
-      // Mapping data ortu
+      // 3️⃣ Mapping data ortu
       final ortu = widget.data!['ortu'] ?? {};
-      ayahController.text = ortu['nama_ayah'] ?? '';
-      ibuController.text = ortu['nama_ibu'] ?? '';
-      waliController.text = ortu['nama_wali'] ?? '';
-      alamatWaliController.text = ortu['alamat_wali'] ?? '';
+      ayahController.text = ortu['nama_ayah']?.toString() ?? '';
+      ibuController.text = ortu['nama_ibu']?.toString() ?? '';
+      waliController.text = ortu['nama_wali']?.toString() ?? '';
+      alamatWaliController.text = ortu['alamat_wali']?.toString() ?? '';
+    }
+
+    // 4️⃣ Fetch list dusun dari database untuk Autocomplete
+    _fetchDusunList();
+  }
+
+  Future<void> _fetchDusunList() async {
+    try {
+      final response = await client.from('wilayah').select('dusun');
+      // Pastikan response berupa List<Map<String, dynamic>>
+      dusunList = (response as List).map((e) => e['dusun'].toString()).toList();
+      if (mounted) setState(() {});
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("⚠️ Gagal fetch dusun: ${e.message}")),
+        );
+      }
+    }
+  }
+
+  // 2️⃣ Ambil data wilayah otomatis berdasarkan dusun yang dipilih
+  Future<void> _fetchWilayahFromDusun(String dusun) async {
+    try {
+      final res = await client.from('wilayah').select('*').eq('dusun', dusun);
+
+      if ((res as List).isNotEmpty) {
+        final wilayah = res.first; // ambil baris pertama
+        if (mounted) {
+          setState(() {
+            desaController.text = wilayah['desa'] ?? '';
+            kecamatanController.text = wilayah['kecamatan'] ?? '';
+            kabupatenController.text = wilayah['kabupaten'] ?? '';
+            provinsiController.text = wilayah['provinsi'] ?? '';
+            kodePosController.text = wilayah['kode_pos'] ?? '';
+          });
+        }
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal ambil wilayah: ${e.message}")),
+        );
+      }
     }
   }
 
@@ -78,8 +133,8 @@ class _StudentFormState extends State<StudentForm> {
     if (!_formKey.currentState!.validate()) return;
 
     try {
-      String? wilayahId = widget.data?['wilayah_id'];
-      String? siswaId = widget.data?['id'];
+      String? wilayahId = widget.data?['wilayah_id']?.toString();
+      String? siswaId = widget.data?['id']?.toString();
 
       // 1️⃣ Insert/update wilayah
       final wilayahData = {
@@ -92,9 +147,15 @@ class _StudentFormState extends State<StudentForm> {
       };
       if (widget.data == null) {
         final res = await client.from('wilayah').insert(wilayahData).select();
-        wilayahId = (res as List).first['id'];
+        wilayahId = (res as List).first['id'].toString();
       } else {
-        await client.from('wilayah').update(wilayahData).eq('id', wilayahId as Object);
+        // jika wilayahId null, mungkin data awal belum punya wilayah, jadi insert
+        if (wilayahId == null || wilayahId.isEmpty) {
+          final res = await client.from('wilayah').insert(wilayahData).select();
+          wilayahId = (res as List).first['id'].toString();
+        } else {
+          await client.from('wilayah').update(wilayahData).eq('id', wilayahId as Object);
+        }
       }
 
       // 2️⃣ Insert/update siswa
@@ -111,7 +172,7 @@ class _StudentFormState extends State<StudentForm> {
       };
       if (widget.data == null) {
         final res = await client.from('siswa').insert(siswaData).select();
-        siswaId = (res as List).first['id'];
+        siswaId = (res as List).first['id'].toString();
       } else {
         await client.from('siswa').update(siswaData).eq('id', siswaId as Object);
       }
@@ -137,9 +198,11 @@ class _StudentFormState extends State<StudentForm> {
 
       if (mounted) Navigator.pop(context, true);
     } on PostgrestException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("⚠️ Gagal simpan: ${e.message}")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("⚠️ Gagal simpan: ${e.message}")),
+        );
+      }
     }
   }
 
@@ -159,84 +222,147 @@ class _StudentFormState extends State<StudentForm> {
     );
   }
 
- @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: Text(widget.data == null ? "Tambah Siswa" : "Edit Siswa"),
-      backgroundColor: Colors.blueAccent,
-    ),
-    body: Form(
-      key: _formKey,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            const Text("=== Data Siswa ===", style: TextStyle(fontWeight: FontWeight.bold)),
-            _field("NISN", nisnController),
-            _field("Nama Panjang", namaController),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.data == null ? "Tambah Siswa" : "Edit Siswa"),
+        backgroundColor: Colors.blueAccent,
+      ),
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("=== Data Siswa ===", style: TextStyle(fontWeight: FontWeight.bold)),
+              _field("NISN", nisnController),
+              _field("Nama Panjang", namaController),
 
-            // 🔥 Dropdown Jenis Kelamin
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: DropdownButtonFormField<String>(
-                value: selectedJenisKelamin,
-                items: const [
-                  DropdownMenuItem(value: 'Laki-laki', child: Text('Laki-laki')),
-                  DropdownMenuItem(value: 'Perempuan', child: Text('Perempuan')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    selectedJenisKelamin = value;
-                    jkController.text = value ?? ''; // Simpan ke controller
-                  });
-                },
-                decoration: InputDecoration(
-                  labelText: 'Jenis Kelamin',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: Colors.blue[50],
+              // Dropdown Jenis Kelamin
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: DropdownButtonFormField<String>(
+                  value: selectedJenisKelamin,
+                  items: const [
+                    DropdownMenuItem(value: 'Laki-laki', child: Text('Laki-laki')),
+                    DropdownMenuItem(value: 'Perempuan', child: Text('Perempuan')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      selectedJenisKelamin = value;
+                      jkController.text = value ?? '';
+                    });
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Jenis Kelamin',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.blue[50],
+                  ),
+                  validator: (value) => value == null || value.isEmpty ? 'Pilih jenis kelamin' : null,
                 ),
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'Pilih jenis kelamin' : null,
               ),
-            ),
 
-            _field("Agama", agamaController),
-            _field("Tempat Lahir", ttlController),
-            _field("No HP", nomorHpController),
-            _field("NIK", nikController),
-            _field("Alamat", alamatController),
+              _field("Agama", agamaController),
 
-            const SizedBox(height: 16),
-            const Text(" Data Wilayah ", style: TextStyle(fontWeight: FontWeight.bold)),
-            _field("Dusun", dusunController),
-            _field("Desa", desaController),
-            _field("Kecamatan", kecamatanController),
-            _field("Kabupaten", kabupatenController),
-            _field("Provinsi", provinsiController),
-            _field("Kode Pos", kodePosController),
+              const SizedBox(height: 12),
 
-            const SizedBox(height: 16),
-            const Text(" Data Orang Tua/Wali ", style: TextStyle(fontWeight: FontWeight.bold)),
-            _field("Nama Ayah", ayahController),
-            _field("Nama Ibu", ibuController),
-            _field("Nama Wali", waliController),
-            _field("Alamat Wali", alamatWaliController),
-
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _saveData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                minimumSize: const Size(double.infinity, 48),
+              // Tanggal lahir dengan DatePicker
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: TextFormField(
+                  controller: ttlController,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: "Tanggal Lahir",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.blue[50],
+                    suffixIcon: const Icon(Icons.calendar_today),
+                  ),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: ttlController.text.isNotEmpty
+                          ? DateTime.tryParse(ttlController.text) ?? DateTime.now()
+                          : DateTime.now(),
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      ttlController.text = date.toIso8601String().split('T').first;
+                    }
+                  },
+                  validator: (v) => (v == null || v.isEmpty) ? "Wajib diisi" : null,
+                ),
               ),
-              child: const Text("Simpan"),
-            ),
-          ],
+
+              _field("No HP", nomorHpController),
+              _field("NIK", nikController),
+              _field("Alamat", alamatController),
+
+              const SizedBox(height: 16),
+              const Text("=== Data Wilayah ===", style: TextStyle(fontWeight: FontWeight.bold)),
+
+              // Autocomplete Dusun
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Autocomplete<String>(
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text == '') return const Iterable<String>.empty();
+                    return dusunList.where((dusun) => dusun.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                  },
+                  fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
+                    controller.text = dusunController.text;
+                    controller.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onEditingComplete: onEditingComplete,
+                      decoration: InputDecoration(
+                        labelText: 'Dusun',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: Colors.blue[50],
+                      ),
+                      validator: (v) => (v == null || v.isEmpty) ? "Wajib diisi" : null,
+                    );
+                  },
+                  onSelected: (value) async {
+                    dusunController.text = value;
+                    await _fetchWilayahFromDusun(value);
+                  },
+                ),
+              ),
+
+              _field("Desa", desaController),
+              _field("Kecamatan", kecamatanController),
+              _field("Kabupaten", kabupatenController),
+              _field("Provinsi", provinsiController),
+              _field("Kode Pos", kodePosController),
+
+              const SizedBox(height: 16),
+              const Text("=== Data Orang Tua/Wali ===", style: TextStyle(fontWeight: FontWeight.bold)),
+              _field("Nama Ayah", ayahController),
+              _field("Nama Ibu", ibuController),
+              _field("Nama Wali", waliController),
+              _field("Alamat Wali", alamatWaliController),
+
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _saveData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+                child: const Text("Simpan"),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
