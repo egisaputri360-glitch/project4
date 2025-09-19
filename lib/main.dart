@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'splash_screen.dart';
-import 'login_screen.dart';
-import 'home_screen.dart';
-import 'student_form_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Inisialisasi Supabase
+  await Supabase.initialize(
+    url: 'https://yurbpaqyrcmiuwczwlho.supabase.co',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1cmJwYXF5cmNtaXV3Y3p3bGhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwNzY4NjgsImV4cCI6MjA3MzY1Mjg2OH0.5-mCFdgW-z0aceKdkk2UjpQ5cBw-NdBj7avpbPbVX_I',
+  );
+
   runApp(const MyApp());
 }
 
@@ -14,32 +21,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Aplikasi Data Siswa',
       debugShowCheckedModeBanner: false,
+      title: "Aplikasi Data Siswa",
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.blue[50],
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.blue[300],
-          foregroundColor: Colors.white,
-          elevation: 2,
-          centerTitle: true,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          filled: true,
-          fillColor: Colors.white,
-        ),
+        primarySwatch: Colors.teal,
+        scaffoldBackgroundColor: Colors.grey[100],
       ),
-      initialRoute: '/',
-      routes: {
-        '/': (_) => const SplashScreen(),
-        '/login': (_) => const LoginScreen(),
-        '/home': (_) => const HomeScreen(),
-        '/form': (_) => const StudentFormScreen(),
-      },
+      home: const SplashScreen(),
     );
   }
 }

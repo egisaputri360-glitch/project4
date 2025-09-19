@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
 
@@ -10,22 +9,13 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  double _opacity = 0.0;
-
   @override
   void initState() {
     super.initState();
-
-    // animasi fade in
-    Timer(const Duration(milliseconds: 300), () {
-      setState(() => _opacity = 1.0);
-    });
-
-    // pindah ke login setelah 3 detik
-    Timer(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 2), () {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
     });
   }
@@ -33,46 +23,20 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blue[50],
+      backgroundColor: Colors.teal[100],
       body: Center(
-        child: AnimatedOpacity(
-          opacity: _opacity,
-          duration: const Duration(seconds: 2),
-          curve: Curves.easeIn,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                height: 120,
-                width: 120,
-                decoration: BoxDecoration(
-                  color: Colors.blue[200],
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
-                ),
-                child: const Icon(Icons.school, size: 70, color: Colors.white),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                "Aplikasi Data Siswa",
-                style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                "by Egi Dwi Saputri",
-                style: TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-            ],
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.school, size: 100, color: Colors.teal),
+            const SizedBox(height: 20),
+            const Text(
+              "Aplikasi Data Siswa",
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            CircularProgressIndicator(color: Colors.teal[700]),
+          ],
         ),
       ),
     );
