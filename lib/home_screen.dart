@@ -1,7 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'crud_screen.dart'; // Import StudentForm for add/edit
+import 'student_form.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,127 +20,119 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchData();
   }
 
-  Future<bool> _checkInternet() async {
-    try {
-      final result = await InternetAddress.lookup('google.com');
-      return result.isNotEmpty;
-    } catch (_) {
-      return false;
-    }
-  }
-
   Future<void> _fetchData() async {
-  setState(() => _loading = true);
-
-  if (!await _checkInternet()) {
-    setState(() => _loading = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Tidak ada koneksi internet!")),
-      );
-    }
-    return;
-  }
-
-  try {
-    final response = await client
-        .from('siswa')
-        .select('''
-          id, nisn, nama_panjang, jenis_kelamin, agama, tempat_lahir, nomor_hp, nik, alamat,
-          wilayah (dusun, desa, kecamatan, kabupaten, provinsi, kode_pos),
-          ortu (nama_ayah, nama_ibu, nama_wali, alamat_wali)
-        ''')
-        .order('nisn');
-
-    print(response); // 🔎 debug
-
-    setState(() {
-      siswaList = List<Map<String, dynamic>>.from(response);
-      _loading = false;
-    });
-  } on PostgrestException catch (e) {
-    setState(() => _loading = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("⚠️ Masalah database: ${e.message}")),
-      );
-    }
-  }
-}
-
-
-  Future<void> _deleteData(String id) async {
-    if (!await _checkInternet()) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("⚠️ Tidak ada koneksi internet!")),
-        );
-      }
-      return;
-    }
+    setState(() { _loading = true; });
     try {
-      // Delete related ortu and wilayah records first
-      await client.from('ortu').delete().eq('siswa_id', id);
-      await client.from('wilayah').delete().eq('id', (await client.from('siswa').select('wilayah_id').eq('id', id)).first['wilayah_id']);
-      await client.from('siswa').delete().eq('id', id);
-      _fetchData();
-    } on PostgrestException catch (e) {
+      final response = await client
+          .from('siswa')
+          .select(', wilayah(), ortu(*)')
+          .order('nama_panjang');
+
+      final data = (response as List<dynamic>).map((json) {
+        return {
+          'id': json['id'], // Biarkan sebagai dynamic, bisa String atau int
+          'nama_panjang': json['nama_panjang'] ?? 'N/A',
+          'nisn': json['nisn']?.toString() ?? 'N/A', // Convert to String
+          'agama': json['agama']?.toString() ?? 'N/A',
+          'jenis_kelamin': json['jenis_kelamin']?.toString() ?? 'N/A',
+          'tempat_lahir': json['tempat_lahir']?.toString() ?? 'N/A',
+          'nomor_hp': json['nomor_hp']?.toString() ?? 'N/A',
+          'nik': json['nik']?.toString() ?? 'N/A',
+          'alamat': json['alamat']?.toString() ?? 'N/A',
+          'wilayah_id': json['wilayah_id'], // Keep as dynamic
+          'wilayah': json['wilayah'],
+          'ortu': json['ortu'],
+        };
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          siswaList = data;
+        });
+      }
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("⚠️ Gagal hapus: ${e.message}")),
+          SnackBar(content: Text("⚠ Gagal fetch data: $e")),
         );
       }
+    } finally {
+      if (mounted) setState(() { _loading = false; });
+    }
+  }
+
+  Future<void> _deleteData(dynamic siswaId, dynamic wilayahId) async {
+    setState(() { _loading = true; });
+    try {
+      // Delete ortu first (child table)
+      await client.from('ortu').delete().eq('siswa_id', siswaId);
+      
+      // Delete siswa
+      await client.from('siswa').delete().eq('id', siswaId);
+      
+      // Delete wilayah if exists
+      if (wilayahId != null) {
+        await client.from('wilayah').delete().eq('id', wilayahId);
+      }
+      
+      _fetchData();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Data berhasil dihapus")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("⚠ Gagal hapus: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() { _loading = false; });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blue[50], // Match student_form.dart background
+      backgroundColor: Colors.blue[50],
       appBar: AppBar(
         title: const Text("📋 Data Siswa"),
-        backgroundColor: Colors.blueAccent, // Consistent with other screens
+        backgroundColor: Colors.blueAccent,
+        foregroundColor: Colors.white,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : siswaList.isEmpty
-              ? const Center(
-                  child: Text(
-                    "Belum ada data siswa",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
-                )
+              ? const Center(child: Text("Belum ada data siswa"))
               : ListView.builder(
                   itemCount: siswaList.length,
                   itemBuilder: (context, index) {
                     final siswa = siswaList[index];
+                    final wilayahId = siswa['wilayah']?['id'];
+
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       elevation: 3,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16), // Consistent rounded corners
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: ListTile(
                         contentPadding: const EdgeInsets.all(16),
                         title: Text(
-                          siswa['nama_panjang'] ?? 'N/A',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            color: Colors.black87,
-                          ),
+                          siswa['nama_panjang']?.toString() ?? 'N/A',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 4),
-                            Text("NISN: ${siswa['nisn'] ?? 'N/A'}", style: const TextStyle(fontSize: 14)),
-                            Text("Jenis Kelamin: ${siswa['jenis_kelamin'] ?? 'N/A'}", style: const TextStyle(fontSize: 14)),
-                            Text("Agama: ${siswa['agama'] ?? 'N/A'}", style: const TextStyle(fontSize: 14)),
-                            Text("Tempat Lahir: ${siswa['tempat_lahir'] ?? 'N/A'}", style: const TextStyle(fontSize: 14)),
-                            Text("Alamat: ${siswa['alamat'] ?? 'N/A'}", style: const TextStyle(fontSize: 14)),
-                            Text("Desa: ${siswa['wilayah']?['desa'] ?? 'N/A'}", style: const TextStyle(fontSize: 14)),
-                            Text("Nama Ayah: ${siswa['ortu']?['nama_ayah'] ?? 'N/A'}", style: const TextStyle(fontSize: 14)),
+                            const SizedBox(height: 8),
+                            Text("NISN: ${siswa['nisn']?.toString() ?? 'N/A'}"),
+                            Text("Jenis Kelamin: ${siswa['jenis_kelamin']?.toString() ?? 'N/A'}"),
+                            Text("Agama: ${siswa['agama']?.toString() ?? 'N/A'}"),
+                            Text("Desa: ${siswa['wilayah']?['desa']?.toString() ?? 'N/A'}"),
+                            Text("Nama Ayah: ${siswa['ortu']?['nama_ayah']?.toString() ?? 'N/A'}"),
                           ],
                         ),
                         trailing: Row(
@@ -150,65 +141,21 @@ class _HomeScreenState extends State<HomeScreen> {
                             IconButton(
                               icon: const Icon(Icons.edit, color: Colors.blueAccent),
                               onPressed: () async {
-                                final updated = await Navigator.push(
+                                final result = await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => StudentForm(data: siswa), // Use StudentForm for edit
+                                    builder: (_) => StudentForm(siswaData: siswa), // Fix: gunakan siswaData
                                   ),
                                 );
-                                if (updated == true) _fetchData();
+                                if (result == true) _fetchData();
                               },
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deleteData(siswa['id'].toString()),
+                              onPressed: () => _showDeleteDialog(siswa['id'], wilayahId),
                             ),
                           ],
                         ),
-                        onTap: () {
-                          // Optional: Show detailed view on tap
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              title: Text(siswa['nama_panjang'] ?? 'N/A'),
-                              content: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text("NISN: ${siswa['nisn'] ?? 'N/A'}"),
-                                    Text("Jenis Kelamin: ${siswa['jenis_kelamin'] ?? 'N/A'}"),
-                                    Text("Agama: ${siswa['agama'] ?? 'N/A'}"),
-                                    Text("Tempat Lahir: ${siswa['tempat_lahir'] ?? 'N/A'}"),
-                                    Text("No HP: ${siswa['nomor_hp'] ?? 'N/A'}"),
-                                    Text("NIK: ${siswa['nik'] ?? 'N/A'}"),
-                                    Text("Alamat: ${siswa['alamat'] ?? 'N/A'}"),
-                                    const Divider(),
-                                    Text("Wilayah:", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    Text("Dusun: ${siswa['wilayah']?['dusun'] ?? 'N/A'}"),
-                                    Text("Desa: ${siswa['wilayah']?['desa'] ?? 'N/A'}"),
-                                    Text("Kecamatan: ${siswa['wilayah']?['kecamatan'] ?? 'N/A'}"),
-                                    Text("Kabupaten: ${siswa['wilayah']?['kabupaten'] ?? 'N/A'}"),
-                                    Text("Provinsi: ${siswa['wilayah']?['provinsi'] ?? 'N/A'}"),
-                                    Text("Kode Pos: ${siswa['wilayah']?['kode_pos'] ?? 'N/A'}"),
-                                    const Divider(),
-                                    Text("Orang Tua/Wali:", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    Text("Nama Ayah: ${siswa['ortu']?['nama_ayah'] ?? 'N/A'}"),
-                                    Text("Nama Ibu: ${siswa['ortu']?['nama_ibu'] ?? 'N/A'}"),
-                                    Text("Nama Wali: ${siswa['ortu']?['nama_wali'] ?? 'N/A'}"),
-                                    Text("Alamat Wali: ${siswa['ortu']?['alamat_wali'] ?? 'N/A'}"),
-                                  ],
-                                ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text("Tutup"),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
                       ),
                     );
                   },
@@ -218,12 +165,38 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () async {
           final created = await Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const StudentForm()), // Use StudentForm for add
+            MaterialPageRoute(builder: (_) => const StudentForm()),
           );
           if (created == true) _fetchData();
         },
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
+    );
+  }
+
+  // Add confirmation dialog for delete
+  void _showDeleteDialog(dynamic siswaId, dynamic wilayahId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Konfirmasi Hapus"),
+          content: const Text("Apakah Anda yakin ingin menghapus data ini?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("Batal"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteData(siswaId, wilayahId);
+              },
+              child: const Text("Hapus", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
     );
   }
 }
