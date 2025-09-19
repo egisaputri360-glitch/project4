@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart' show CrudScreen;
+import 'home_screen.dart'; // Import home_screen.dart which contains CrudScreen
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,8 +14,12 @@ class HomeScreen extends StatelessWidget {
       body: Center(
         child: ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.teal, // background
-            foregroundColor: Colors.white, // warna teks dan ikon
+            backgroundColor: Colors.teal,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           icon: const Icon(Icons.list),
           label: const Text('Lihat Data Siswa'),
@@ -23,7 +27,7 @@ class HomeScreen extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => CrudScreen(), // tanpa "const"
+                builder: (context) => const HomeScreen(), // Use const for stateless widget
               ),
             );
           },

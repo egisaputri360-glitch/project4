@@ -182,8 +182,8 @@ Widget build(BuildContext context) {
               child: DropdownButtonFormField<String>(
                 value: selectedJenisKelamin,
                 items: const [
-                  DropdownMenuItem(value: 'L', child: Text('Laki-laki')),
-                  DropdownMenuItem(value: 'P', child: Text('Perempuan')),
+                  DropdownMenuItem(value: 'Laki-laki', child: Text('Laki-laki')),
+                  DropdownMenuItem(value: 'Perempuan', child: Text('Perempuan')),
                 ],
                 onChanged: (value) {
                   setState(() {
