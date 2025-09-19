@@ -209,7 +209,7 @@ Widget build(BuildContext context) {
             _field("Alamat", alamatController),
 
             const SizedBox(height: 16),
-            const Text("=== Data Wilayah ===", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(" Data Wilayah ", style: TextStyle(fontWeight: FontWeight.bold)),
             _field("Dusun", dusunController),
             _field("Desa", desaController),
             _field("Kecamatan", kecamatanController),
@@ -218,7 +218,7 @@ Widget build(BuildContext context) {
             _field("Kode Pos", kodePosController),
 
             const SizedBox(height: 16),
-            const Text("=== Data Orang Tua/Wali ===", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(" Data Orang Tua/Wali ", style: TextStyle(fontWeight: FontWeight.bold)),
             _field("Nama Ayah", ayahController),
             _field("Nama Ibu", ibuController),
             _field("Nama Wali", waliController),
